@@ -3,7 +3,8 @@ app_id: [your app id]
 app_secret: [your app secret]
 sources: # multiple source, mapping every source to one account only (could be the same)
   - rss: [rss address from rsshub: https://docs.rsshub.app/social-media.html#twitter-yong-hu-shi-jian-xian]
-    access_token: [account access_token]
+    username: [username]
+    password: [password]
     name_cleaner: Twitter\s@ # regex, replace rss.channel.title
     cleaner: <p>.*\d+</p> # regex, replace all string in rss.channel.item.description with 'clean'
     clean: |-

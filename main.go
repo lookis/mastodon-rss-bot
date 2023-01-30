@@ -22,7 +22,8 @@ import (
 
 type SourceDest struct {
 	RSS         string `mapstructure:"rss"`
-	AccessToken string `mapstructure:"access_token"`
+	Username    string `mapstructure:"username"`
+	Password    string `mapstructure:"password"`
 	NameCleaner string `mapstructure:"name_cleaner,omitempty"`
 	Cleaner     string `mapstructure:"cleaner,omitempty"`
 	CleanText   string `mapstructure:"clean,omitempty"`
@@ -122,8 +123,8 @@ func run(ctx context.Context, c *Config) {
 			Server:       c.Server,
 			ClientID:     c.AppId,
 			ClientSecret: c.AppSecret,
-			AccessToken:  source.AccessToken,
 		})
+		masto.Authenticate(ctx, source.Username, source.Password)
 		//get rss feeds
 		if feed, err := fp.ParseURL(source.RSS); err == nil {
 			logrus.Info(fmt.Sprintf("read %s success\n", source.RSS))
