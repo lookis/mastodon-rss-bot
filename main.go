@@ -63,7 +63,9 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 		}
 	}
 	logrus.Info(fmt.Sprintf("update profile with %+v\n", profile))
-	masto.AccountUpdate(ctx, profile)
+	if _, err := masto.AccountUpdate(ctx, profile); err != nil {
+		logrus.Warn(err)
+	}
 }
 
 func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item, cleaner *regexp.Regexp, cleanText string) {
