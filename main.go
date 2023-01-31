@@ -66,6 +66,22 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 	if _, err := masto.AccountUpdate(ctx, profile); err != nil {
 		logrus.Warn(err)
 	}
+	if req, err := http.NewRequestWithContext(ctx, http.MethodPatch, masto.Config.Server+"/api/v1/accounts/update_credentials", strings.NewReader("discoverable=true")); err == nil {
+		req.Header.Set("Authorization", "Bearer "+masto.Config.AccessToken)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if resp, err := http.DefaultClient.Do(req); err == nil {
+			defer resp.Body.Close()
+			if _, err := ioutil.ReadAll(resp.Body); err == nil {
+				logrus.Info("profile updated")
+			} else {
+				logrus.Warn(err)
+			}
+		} else {
+			logrus.Warn(err)
+		}
+	} else {
+		logrus.Warn(err)
+	}
 }
 
 func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item, cleaner *regexp.Regexp, cleanText string) {
