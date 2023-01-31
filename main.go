@@ -53,7 +53,7 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 				defer resp.Body.Close()
 				if body, err := ioutil.ReadAll(resp.Body); err == nil {
 					avatar := base64.StdEncoding.EncodeToString(body)
-					profile.Avatar = avatar
+					profile.Avatar = fmt.Sprintf("data:image/png;base64,%s", avatar)
 				} else {
 					logrus.Warn(err)
 				}
@@ -62,7 +62,7 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 			}
 		}
 	}
-	logrus.Info(fmt.Sprintf("update profile with %+v\n", profile))
+	logrus.Info("update profile.")
 	if _, err := masto.AccountUpdate(ctx, profile); err != nil {
 		logrus.Warn(err)
 	}
