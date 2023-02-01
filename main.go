@@ -25,8 +25,6 @@ type SourceDest struct {
 	Username    string `mapstructure:"username"`
 	Password    string `mapstructure:"password"`
 	NameCleaner string `mapstructure:"name_cleaner,omitempty"`
-	Cleaner     string `mapstructure:"cleaner,omitempty"`
-	CleanText   string `mapstructure:"clean,omitempty"`
 }
 
 type Config struct {
@@ -84,13 +82,9 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 	}
 }
 
-func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item, cleaner *regexp.Regexp, cleanText string) {
-	cleanDescription := item.Description
-	if cleaner != nil {
-		cleanDescription = cleaner.ReplaceAllString(item.Description, cleanText)
-	}
-	if document, err := goquery.NewDocumentFromReader(strings.NewReader(cleanDescription)); err == nil {
-		status := strings.TrimSpace(document.Text())
+func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item) {
+	if document, err := goquery.NewDocumentFromReader(strings.NewReader(item.Description)); err == nil {
+		status := strings.TrimSpace(item.Title)
 		urls := document.Find("img").Map(func(index int, selection *goquery.Selection) string {
 			return selection.AttrOr("src", "")
 		})
@@ -100,6 +94,9 @@ func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item, 
 		//upload all pics
 		medias := []mastodon.ID{}
 		for _, url := range urls {
+			if len(url) == 0 {
+				continue
+			}
 			if resp, err := http.Get(url); err == nil {
 				defer resp.Body.Close()
 				if attachment, err := masto.UploadMediaFromReader(ctx, resp.Body); err == nil {
@@ -131,11 +128,6 @@ func run(ctx context.Context, c *Config) {
 	fp := gofeed.NewParser()
 	logrus.Info("syncing...")
 	for _, source := range c.Sources { // for every diff rss source
-		//init description cleaner to filter
-		var cleaner *regexp.Regexp
-		if len(source.Cleaner) != 0 {
-			cleaner = regexp.MustCompile(source.Cleaner)
-		}
 		//create client
 		masto := mastodon.NewClient(&mastodon.Config{
 			Server:       c.Server,
@@ -173,7 +165,7 @@ func run(ctx context.Context, c *Config) {
 				}
 				//publish
 				for _, item := range publishStatus {
-					syncStatus(ctx, masto, item, cleaner, source.CleanText)
+					syncStatus(ctx, masto, item)
 				}
 				logrus.Info(fmt.Sprintf("published {%d} status", len(publishStatus)))
 			} else {
