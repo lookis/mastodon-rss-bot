@@ -3,7 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -18,6 +22,8 @@ import (
 	"github.com/mmcdole/gofeed"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+
+	"github.com/nfnt/resize"
 )
 
 type SourceDest struct {
@@ -49,7 +55,7 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 		if feed.Image != nil {
 			if resp, err := http.Get(feed.Image.URL); err == nil {
 				defer resp.Body.Close()
-				if body, err := ioutil.ReadAll(resp.Body); err == nil {
+				if body, err := io.ReadAll(resp.Body); err == nil {
 					avatar := base64.StdEncoding.EncodeToString(body)
 					profile.Avatar = fmt.Sprintf("data:image/png;base64,%s", avatar)
 				} else {
@@ -69,7 +75,7 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		if resp, err := http.DefaultClient.Do(req); err == nil {
 			defer resp.Body.Close()
-			if _, err := ioutil.ReadAll(resp.Body); err == nil {
+			if _, err := io.ReadAll(resp.Body); err == nil {
 				logrus.Info("profile updated")
 			} else {
 				logrus.Warn(err)
@@ -99,9 +105,26 @@ func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item) 
 			}
 			if resp, err := http.Get(url); err == nil {
 				defer resp.Body.Close()
-				if attachment, err := masto.UploadMediaFromReader(ctx, resp.Body); err == nil {
-					medias = append(medias, attachment.ID)
+				if sourceImage, _, err := image.Decode(resp.Body); err == nil {
+					sourceImage = resize.Thumbnail(720, 1280*2, sourceImage, resize.Lanczos3)
+					reader, writer := io.Pipe()
+					defer reader.Close()
+					defer writer.Close()
+					if err := jpeg.Encode(writer, sourceImage, &jpeg.Options{Quality: 95}); err == nil {
+						if attachment, err := masto.UploadMediaFromReader(ctx, reader); err == nil {
+							logrus.Debug("image uploaded")
+							medias = append(medias, attachment.ID)
+						} else {
+							logrus.Debug("image uploading error")
+							logrus.Warn(err)
+						}
+					} else {
+						logrus.Debug("image encode error")
+						logrus.Warn(err)
+					}
+
 				} else {
+					logrus.Debug("image decode error, ", url)
 					logrus.Warn(err)
 				}
 			} else {
