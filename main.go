@@ -107,7 +107,7 @@ func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item) 
 			if resp, err := http.Get(url); err == nil {
 				defer resp.Body.Close()
 				if sourceImage, _, err := image.Decode(resp.Body); err == nil {
-					sourceImage = resize.Thumbnail(720, 1280*2, sourceImage, resize.Lanczos3)
+					sourceImage = resize.Thumbnail(4096, 4096, sourceImage, resize.Lanczos3)
 					buf := new(bytes.Buffer)
 					logrus.Debug("image processing")
 					if err := jpeg.Encode(buf, sourceImage, &jpeg.Options{Quality: 95}); err == nil {
