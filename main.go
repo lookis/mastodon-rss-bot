@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"image"
@@ -107,11 +108,11 @@ func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item) 
 				defer resp.Body.Close()
 				if sourceImage, _, err := image.Decode(resp.Body); err == nil {
 					sourceImage = resize.Thumbnail(720, 1280*2, sourceImage, resize.Lanczos3)
-					reader, writer := io.Pipe()
-					defer reader.Close()
-					defer writer.Close()
-					if err := jpeg.Encode(writer, sourceImage, &jpeg.Options{Quality: 95}); err == nil {
-						if attachment, err := masto.UploadMediaFromReader(ctx, reader); err == nil {
+					buf := new(bytes.Buffer)
+					logrus.Debug("image processing")
+					if err := jpeg.Encode(buf, sourceImage, &jpeg.Options{Quality: 95}); err == nil {
+						logrus.Debug("image compressed")
+						if attachment, err := masto.UploadMediaFromBytes(ctx, buf.Bytes()); err == nil {
 							logrus.Debug("image uploaded")
 							medias = append(medias, attachment.ID)
 						} else {
