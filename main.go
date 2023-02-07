@@ -28,10 +28,12 @@ import (
 )
 
 type SourceDest struct {
-	RSS         string `mapstructure:"rss"`
-	Username    string `mapstructure:"username"`
-	Password    string `mapstructure:"password"`
-	NameCleaner string `mapstructure:"name_cleaner,omitempty"`
+	RSS         string  `mapstructure:"rss"`
+	Username    string  `mapstructure:"username"`
+	Password    string  `mapstructure:"password"`
+	NameCleaner string  `mapstructure:"name_cleaner"`
+	SyncProfile bool    `mapstructure:"profile,omitempty"`
+	Status      *string `mapstructure:"status,omitempty"`
 }
 
 type Config struct {
@@ -89,9 +91,14 @@ func updateProfile(ctx context.Context, masto *mastodon.Client, feed *gofeed.Fee
 	}
 }
 
-func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item) {
+func syncStatus(ctx context.Context, masto *mastodon.Client, item *gofeed.Item, config SourceDest) {
 	if document, err := goquery.NewDocumentFromReader(strings.NewReader(item.Description)); err == nil {
-		status := strings.TrimSpace(item.Title)
+		status := ""
+		if config.Status == nil {
+			status = strings.TrimSpace(item.Title)
+		} else {
+			status = *config.Status
+		}
 		urls := document.Find("img").Map(func(index int, selection *goquery.Selection) string {
 			return selection.AttrOr("src", "")
 		})
@@ -163,7 +170,9 @@ func run(ctx context.Context, c *Config) {
 		if feed, err := fp.ParseURL(source.RSS); err == nil {
 			logrus.Info(fmt.Sprintf("read %s success\n", source.RSS))
 			// try update profile
-			updateProfile(ctx, masto, feed, source)
+			if source.SyncProfile {
+				updateProfile(ctx, masto, feed, source)
+			}
 			if account, err := masto.GetAccountCurrentUser(ctx); err == nil {
 				//get last posted status create time, only publish new status
 				var latestStatusCreatedAt *time.Time = nil
@@ -189,7 +198,7 @@ func run(ctx context.Context, c *Config) {
 				}
 				//publish
 				for _, item := range publishStatus {
-					syncStatus(ctx, masto, item)
+					syncStatus(ctx, masto, item, source)
 				}
 				logrus.Info(fmt.Sprintf("published {%d} status", len(publishStatus)))
 			} else {
